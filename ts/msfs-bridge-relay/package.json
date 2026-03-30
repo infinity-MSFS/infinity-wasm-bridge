@@ -1,0 +1,19 @@
+{
+    "name": "msfs-bridge-relay",
+    "version": "0.1.0",
+    "description": "Generic MSFS gauge relay — bridges WebSocket (host) to CommBus (WASM) transparently",
+    "license": "MIT",
+    "main": "src/index.ts",
+    "types": "src/index.ts",
+    "files": [
+        "src"
+    ],
+    "scripts": {
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@microsoft/msfs-sdk": "*",
+        "@microsoft/msfs-types": "*",
+        "typescript": "^5.0.0"
+    }
+}

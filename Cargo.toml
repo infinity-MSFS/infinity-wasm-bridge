@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/msfs-bridge-wire",
+    "crates/msfs-bridge-wasm",
+    "crates/msfs-bridge-host",
+    "examples/host-app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"

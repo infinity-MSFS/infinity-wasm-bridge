@@ -1,0 +1,15 @@
+[package]
+name = "msfs-bridge-host"
+description = "Host-side WebSocket server for msfs-bridge — async tokio, no framework dependency"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+msfs-bridge-wire = { path = "../msfs-bridge-wire" }
+axum = { version = "0.8", features = ["ws"] }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "time", "rt", "macros"] }
+uuid = { version = "1", features = ["v4"] }

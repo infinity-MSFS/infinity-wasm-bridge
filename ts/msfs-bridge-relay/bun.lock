@@ -1,0 +1,20 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "msfs-bridge-relay",
+      "devDependencies": {
+        "@microsoft/msfs-sdk": "*",
+        "@microsoft/msfs-types": "*",
+        "typescript": "^5.0.0",
+      },
+    },
+  },
+  "packages": {
+    "@microsoft/msfs-sdk": ["@microsoft/msfs-sdk@2.3.3", "", {}, "sha512-MWeuPSgq/RdtcWZ5/ZThrZzPpIgJLCjwtI52R+r9xZGsq+2gmnmytN+SeSciw683l+vUEYcYRP1avaxfwCUxuA=="],
+
+    "@microsoft/msfs-types": ["@microsoft/msfs-types@1.14.6", "", {}, "sha512-p2dmrxMpnurr7lOFRKjLCysxR6bb+MWJmRvYQkaExq7qBc8bu98WgI14X8W+pf2g0rlH69cN+uP9Kvz/dnPDuw=="],
+
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+  }
+}

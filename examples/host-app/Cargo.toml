@@ -1,0 +1,21 @@
+[package]
+name = "msfs-bridge-example-host"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "host-app"
+path = "src/main.rs"
+
+[[bin]]
+name = "fake-gauge"
+path = "src/fake_gauge.rs"
+
+[dependencies]
+msfs-bridge-host = { path = "../../crates/msfs-bridge-host" }
+msfs-bridge-wire = { path = "../../crates/msfs-bridge-wire" }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.26"
+futures = "0.3"
