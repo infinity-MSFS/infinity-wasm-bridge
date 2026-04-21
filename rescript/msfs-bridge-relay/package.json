@@ -19,7 +19,8 @@
     },
     "./Dedup": {
       "import": "./src/Dedup.res.mjs"
-    }
+    },
+    "./src/*.res.mjs": "./src/*.res.mjs"
   },
   "scripts": {
     "build": "rescript",

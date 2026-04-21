@@ -17,7 +17,9 @@
     },
     "./shell": {
       "import": "./src/instrumentShell.mjs"
-    }
+    },
+    "./src/*.res.mjs": "./src/*.res.mjs",
+    "./src/*.mjs": "./src/*.mjs"
   },
   "scripts": {
     "build": "rescript",

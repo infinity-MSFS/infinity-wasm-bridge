@@ -15,6 +15,8 @@
 
 open MsfsBindings
 
+exception BridgeError(string)
+
 // ---- Pending requests ----
 
 type pendingRequest = {
@@ -275,6 +277,7 @@ and onHostCommand = (relay: t, cmd: Wire.wireMsg): unit =>
           resolve: response => sendAck(relay, ~id=cmdId, ~ok=true, ~response),
           reject: err => {
             let msg = switch err {
+            | BridgeError(m) => m
             | Exn.Error(e) => Exn.message(e)->Option.getOr("unknown")
             | _ => "unknown"
             }
@@ -291,7 +294,7 @@ and onHostCommand = (relay: t, cmd: Wire.wireMsg): unit =>
           Map.delete(relay.pending, requestId)->ignore
           clearTimeout(p.timerId)
           p.reject(
-            Exn.raiseError("COMMBUS_NOT_READY: CommBus not initialized"),
+            BridgeError("COMMBUS_NOT_READY: CommBus not initialized"),
           )
         | None => ()
         }
@@ -352,7 +355,7 @@ let onWasmMessage = (relay: t, raw: string): unit =>
         p.resolve(resp.response->Option.getOr(JSON.Encode.null))
       } else {
         p.reject(
-          Exn.raiseError(
+          BridgeError(
             resp.error->Option.getOr("[msfs-bridge] WASM returned error"),
           ),
         )
@@ -394,7 +397,7 @@ let destroy = (relay: t): unit => {
   // more callbacks.
   Map.forEach(relay.pending, p => {
     clearTimeout(p.timerId)
-    p.reject(Exn.raiseError("[msfs-bridge] Relay destroyed"))
+    p.reject(BridgeError("[msfs-bridge] Relay destroyed"))
   })
   Map.clear(relay.pending)
 
