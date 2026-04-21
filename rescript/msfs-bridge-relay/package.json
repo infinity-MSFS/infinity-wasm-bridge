@@ -1,0 +1,38 @@
+{
+  "name": "@infinity-msfs/bridge-relay",
+  "version": "0.1.0",
+  "description": "ReScript MSFS CommBus bridge relay for desktop ↔ gauge communication.",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src/**/*.res",
+    "src/**/*.resi",
+    "src/**/*.res.mjs",
+    "rescript.json"
+  ],
+  "exports": {
+    ".": {
+      "import": "./src/BridgeRelay.res.mjs"
+    },
+    "./Wire": {
+      "import": "./src/Wire.res.mjs"
+    },
+    "./Dedup": {
+      "import": "./src/Dedup.res.mjs"
+    }
+  },
+  "scripts": {
+    "build": "rescript",
+    "clean": "rescript clean",
+    "watch": "rescript -w"
+  },
+  "peerDependencies": {
+    "rescript": "^11.1.0"
+  },
+  "devDependencies": {
+    "rescript": "^11.1.4"
+  },
+  "dependencies": {
+    "@rescript/core": "^1.6.1"
+  }
+}

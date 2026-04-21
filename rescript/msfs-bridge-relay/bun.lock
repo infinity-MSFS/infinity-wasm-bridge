@@ -1,0 +1,22 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@infinity-msfs/bridge-relay",
+      "dependencies": {
+        "@rescript/core": "^1.6.1",
+      },
+      "devDependencies": {
+        "rescript": "^11.1.4",
+      },
+      "peerDependencies": {
+        "rescript": "^11.1.0",
+      },
+    },
+  },
+  "packages": {
+    "@rescript/core": ["@rescript/core@1.6.1", "", { "peerDependencies": { "rescript": ">=11.1.0" } }, "sha512-vyb5k90ck+65Fgui+5vCja/mUfzKaK3kOPT4Z6aAJdHLH1eljEi1zKhXroCiCtpNLSWp8k4ulh1bdB5WS0hvqA=="],
+
+    "rescript": ["rescript@11.1.4", "", { "bin": { "bsc": "bsc", "rescript": "rescript", "bstracing": "lib/bstracing" } }, "sha512-0bGU0bocihjSC6MsE3TMjHjY0EUpchyrREquLS8VsZ3ohSMD+VHUEwimEfB3kpBI1vYkw3UFZ3WD8R28guz/Vw=="],
+  }
+}

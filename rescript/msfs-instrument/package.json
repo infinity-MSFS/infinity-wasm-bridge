@@ -1,0 +1,34 @@
+{
+  "name": "@infinity-msfs/instrument",
+  "version": "0.1.0",
+  "description": "ReScript bindings for registering MSFS BaseInstrument subclasses.",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src/**/*.res",
+    "src/**/*.resi",
+    "src/**/*.res.mjs",
+    "src/**/*.mjs",
+    "rescript.json"
+  ],
+  "exports": {
+    ".": {
+      "import": "./src/Instrument.res.mjs"
+    },
+    "./shell": {
+      "import": "./src/instrumentShell.mjs"
+    }
+  },
+  "scripts": {
+    "build": "rescript",
+    "clean": "rescript clean",
+    "watch": "rescript -w"
+  },
+  "peerDependencies": {
+    "rescript": "^11.1.0"
+  },
+  "devDependencies": {
+    "@rescript/core": "^1.6.1",
+    "rescript": "^11.1.4"
+  }
+}
