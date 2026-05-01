@@ -7,7 +7,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use futures::{SinkExt, StreamExt};
-use msfs_bridge_wire::{BridgeError, EventPayload, WireMsg};
+use infinity_bridge_wire::{BridgeError, EventPayload, WireMsg};
 use serde_json::Value;
 use tokio::sync::{broadcast, mpsc, watch};
 
@@ -70,7 +70,7 @@ impl BridgeServer {
 
         tokio::spawn(async move {
             if let Err(e) = axum::serve(listener, app).await {
-                eprintln!("[msfs-bridge-host] Server error: {e}");
+                eprintln!("[infinity-bridge-host] Server error: {e}");
             }
         });
 

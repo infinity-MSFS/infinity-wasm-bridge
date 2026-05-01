@@ -21,7 +21,7 @@
 //! ```
 
 use futures::{SinkExt, StreamExt};
-use msfs_bridge_wire::{AckPayload, EventPayload, HelloPayload, WireMsg};
+use infinity_bridge_wire::{AckPayload, EventPayload, HelloPayload, WireMsg};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::sync::mpsc;

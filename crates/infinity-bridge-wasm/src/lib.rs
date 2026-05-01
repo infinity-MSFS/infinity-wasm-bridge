@@ -1,6 +1,6 @@
 //!
 //! ```rust,ignore
-//! use msfs_bridge_wasm::{Bridge, BridgeConfig, CommBusBackend};
+//! use infinity_bridge_wasm::{Bridge, BridgeConfig, CommBusBackend};
 //! use serde_json::{json, Value};
 //!
 //! // Implement CommBusBackend for your MSFS SDK bindings
@@ -40,4 +40,4 @@ mod bridge;
 
 pub use backend::CommBusBackend;
 pub use bridge::{Bridge, BridgeConfig, BridgeHandler, Router};
-pub use msfs_bridge_wire::{BridgeError, ErrorKind};
+pub use infinity_bridge_wire::{BridgeError, ErrorKind};

@@ -40,14 +40,14 @@ You are not limited by transport. You are limited by the sim.
  ┌─────────────────────────────── MSFS Process ──────────────────────────────────┐
  │                                                                                │
  │  ┌─────────────────────┐    CommBus JSON    ┌──────────────────────────────┐  │
- │  │  msfs-bridge-wasm   │ ◄────────────────► │  msfs-bridge-relay (JS/TS)   │  │
+ │  │  infinity-bridge-wasm   │ ◄────────────────► │  infinity-bridge-relay (JS/TS)   │  │
  │  │  (Rust WASM gauge)  │                    │  (Coherent HTML gauge)       │  │
  │  └─────────────────────┘                    └──────────┬───────────────────┘  │
  │                                                        │ WebSocket             │
  └────────────────────────────────────────────────────────┼───────────────────────┘
                                                           │
                                               ┌───────────▼───────────────────┐
-                                              │  msfs-bridge-host (Rust/Tokio) │
+                                              │  infinity-bridge-host (Rust/Tokio) │
                                               │  WebSocket server (axum)       │
                                               └───────────────────────────────┘
 ```
@@ -56,10 +56,10 @@ You are not limited by transport. You are limited by the sim.
 
 | Crate | Description |
 |---|---|
-| [`msfs-bridge-wire`](crates/msfs-bridge-wire) | Shared wire format types (`no_std` compatible) |
-| [`msfs-bridge-wasm`](crates/msfs-bridge-wasm) | WASM gauge side — CommBus abstraction and command router |
-| [`msfs-bridge-host`](crates/msfs-bridge-host) | Host application side — async WebSocket server |
-| [`msfs-bridge-relay`](ts/msfs-bridge-relay) | TypeScript relay running inside the Coherent HTML gauge |
+| [`infinity-bridge-wire`](crates/infinity-bridge-wire) | Shared wire format types (`no_std` compatible) |
+| [`infinity-bridge-wasm`](crates/infinity-bridge-wasm) | WASM gauge side — CommBus abstraction and command router |
+| [`infinity-bridge-host`](crates/infinity-bridge-host) | Host application side — async WebSocket server |
+| [`infinity-bridge-relay`](ts/infinity-bridge-relay) | TypeScript relay running inside the Coherent HTML gauge |
 
 ---
 
@@ -71,14 +71,14 @@ Add the dependency:
 
 ```toml
 [dependencies]
-msfs-bridge-host = { path = "crates/msfs-bridge-host" }
+infinity-bridge-host = { path = "crates/infinity-bridge-host" }
 tokio = { version = "1", features = ["full"] }
 ```
 
 Start the server and interact with the gauge:
 
 ```rust
-use msfs_bridge_host::{BridgeServer, ServerConfig};
+use infinity_bridge_host::{BridgeServer, ServerConfig};
 use serde_json::json;
 use std::time::Duration;
 
@@ -115,7 +115,7 @@ async fn main() {
 Install the relay package into your HTML gauge project, then initialize it in your `BaseInstrument`:
 
 ```typescript
-import { BridgeRelay } from 'msfs-bridge-relay';
+import { BridgeRelay } from 'infinity-bridge-relay';
 
 export class MyGauge extends BaseInstrument {
     private relay!: BridgeRelay;
@@ -143,7 +143,7 @@ export class MyGauge extends BaseInstrument {
 The WASM crate has no dependency on the MSFS SDK — you provide a thin `CommBusBackend` impl:
 
 ```rust
-use msfs_bridge_wasm::{CommBusBackend, BridgeConfig, Bridge, Router};
+use infinity_bridge_wasm::{CommBusBackend, BridgeConfig, Bridge, Router};
 
 // Wire up your msfs crate version
 struct MyBackend;
@@ -187,7 +187,7 @@ bridge.emit("telemetry", json!({"altitude_ft": 35_000, "speed_kts": 285}))?;
 
 ### Wire Protocol
 
-All messages are JSON with a `"t"` discriminant field. Defined in `msfs-bridge-wire` and mirrored in the TypeScript relay.
+All messages are JSON with a `"t"` discriminant field. Defined in `infinity-bridge-wire` and mirrored in the TypeScript relay.
 
 | Message | Direction | Description |
 |---|---|---|

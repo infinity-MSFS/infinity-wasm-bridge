@@ -418,6 +418,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "infinity-bridge-example-host"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "infinity-bridge-host",
+ "infinity-bridge-wire",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite 0.26.2",
+]
+
+[[package]]
+name = "infinity-bridge-host"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "infinity-bridge-wire",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "infinity-bridge-wasm"
+version = "0.1.0"
+dependencies = [
+ "infinity-bridge-wire",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "infinity-bridge-wire"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -487,48 +529,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys",
-]
-
-[[package]]
-name = "msfs-bridge-example-host"
-version = "0.1.0"
-dependencies = [
- "futures",
- "msfs-bridge-host",
- "msfs-bridge-wire",
- "serde_json",
- "tokio",
- "tokio-tungstenite 0.26.2",
-]
-
-[[package]]
-name = "msfs-bridge-host"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures",
- "msfs-bridge-wire",
- "serde",
- "serde_json",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "msfs-bridge-wasm"
-version = "0.1.0"
-dependencies = [
- "msfs-bridge-wire",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "msfs-bridge-wire"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 {
-  "name": "@infinity-msfs/instrument",
+  "name": "@infinity-msfs/rescript-instrument",
   "sources": [
     {
       "dir": "src",

@@ -1,5 +1,5 @@
 //! ```rust,ignore
-//! use msfs_bridge_host::{BridgeServer, ServerConfig};
+//! use infinity_bridge_host::{BridgeServer, ServerConfig};
 //! use serde_json::json;
 //! use std::time::Duration;
 //!
@@ -51,5 +51,5 @@ mod hub;
 mod server;
 
 pub use hub::ClientInfo;
-pub use msfs_bridge_wire::{BridgeError, ErrorKind, EventPayload, HelloPayload};
+pub use infinity_bridge_wire::{BridgeError, ErrorKind, EventPayload, HelloPayload};
 pub use server::{BridgeServer, ServerConfig};

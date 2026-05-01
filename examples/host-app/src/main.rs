@@ -26,8 +26,8 @@
 //! 6. Listen for events from the gauge
 //! 7. Demonstrate error handling (timeout, no clients, application errors)
 
-use msfs_bridge_host::{BridgeServer, ServerConfig};
-use msfs_bridge_wire::ErrorKind;
+use infinity_bridge_host::{BridgeServer, ServerConfig};
+use infinity_bridge_wire::ErrorKind;
 use serde_json::json;
 use std::time::Duration;
 

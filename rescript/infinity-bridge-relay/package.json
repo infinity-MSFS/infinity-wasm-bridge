@@ -1,8 +1,28 @@
 {
-  "name": "@infinity-msfs/bridge-relay",
+  "name": "@infinity-msfs/rescript-bridge-relay",
   "version": "0.1.0",
   "description": "ReScript MSFS CommBus bridge relay for desktop ↔ gauge communication.",
   "license": "MIT",
+  "author": "cameron_griego@protonmail.com",
+  "homepage": "https://github.com/infinity-MSFS/infinity-wasm-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/infinity-MSFS/infinity-wasm-bridge.git",
+    "directory": "rescript/infinity-bridge-relay"
+  },
+  "bugs": {
+    "url": "https://github.com/infinity-MSFS/infinity-wasm-bridge/issues"
+  },
+  "keywords": [
+    "msfs",
+    "flightsim",
+    "rescript",
+    "commbus",
+    "websocket",
+    "relay",
+    "coherent",
+    "gauge"
+  ],
   "type": "module",
   "files": [
     "src/**/*.res",

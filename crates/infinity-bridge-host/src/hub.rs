@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use msfs_bridge_wire::{AckPayload, BridgeError, CmdPayload, EventPayload, HelloPayload, WireMsg};
+use infinity_bridge_wire::{AckPayload, BridgeError, CmdPayload, EventPayload, HelloPayload, WireMsg};
 use serde_json::Value;
 use tokio::sync::{Mutex, broadcast, mpsc, oneshot, watch};
 use uuid::Uuid;

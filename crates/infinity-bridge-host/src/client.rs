@@ -1,4 +1,4 @@
-use msfs_bridge_wire::HelloPayload;
+use infinity_bridge_wire::HelloPayload;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 

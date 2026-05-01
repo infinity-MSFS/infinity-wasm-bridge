@@ -2,9 +2,11 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "@infinity-msfs/instrument",
-      "devDependencies": {
+      "name": "@infinity-msfs/rescript-bridge-relay",
+      "dependencies": {
         "@rescript/core": "^1.6.1",
+      },
+      "devDependencies": {
         "rescript": "^11.1.4",
       },
       "peerDependencies": {

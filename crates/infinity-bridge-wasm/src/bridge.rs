@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use msfs_bridge_wire::{BridgeError, EventPayload, WireMsg};
+use infinity_bridge_wire::{BridgeError, EventPayload, WireMsg};
 use serde_json::Value;
 
 use crate::backend::CommBusBackend;
@@ -52,7 +52,7 @@ type EventFn = Box<dyn Fn(&Value)>;
 /// or unrecognized commands.
 ///
 /// ```rust,ignore
-/// use msfs_bridge_wasm::Router;
+/// use infinity_bridge_wasm::Router;
 /// use serde_json::{json, Value};
 /// use std::cell::RefCell;
 ///

@@ -1,6 +1,6 @@
 //! # Example: WASM Gauge (cannot compile without MSFS SDK)
 //!
-//! This file shows the complete pattern for integrating msfs-bridge-wasm
+//! This file shows the complete pattern for integrating infinity-bridge-wasm
 //! into a real MSFS WASM gauge. It includes:
 //!
 //! 1. The `CommBusBackend` implementation bridging to your `msfs` crate
@@ -12,7 +12,7 @@
 //!
 //! ```
 //! my-addon-wasm/
-//! ├── Cargo.toml              # depends on msfs, msfs-bridge-wasm
+//! ├── Cargo.toml              # depends on msfs, infinity-bridge-wasm
 //! └── src/
 //!     ├── lib.rs              # export_system!
 //!     ├── comm_bus_backend.rs  # CommBusBackend impl (this file's top section)
@@ -24,12 +24,12 @@
 // PART 1: CommBusBackend implementation
 // ═══════════════════════════════════════════════════════════════════════
 //
-// This bridges msfs-bridge-wasm to your specific msfs crate version.
+// This bridges infinity-bridge-wasm to your specific msfs crate version.
 // You write this once and never touch it again.
 
 /*
 use msfs::comm_bus::{self, BroadcastFlags, Subscription};
-use msfs_bridge_wasm::CommBusBackend;
+use infinity_bridge_wasm::CommBusBackend;
 
 /// CommBus backend wired to the `msfs` crate.
 pub struct MsfsCommBus;
@@ -65,7 +65,7 @@ impl CommBusBackend for MsfsCommBus {
 
 /*
 use msfs::prelude::*;
-use msfs_bridge_wasm::{Bridge, BridgeConfig, Router};
+use infinity_bridge_wasm::{Bridge, BridgeConfig, Router};
 use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::rc::Rc;

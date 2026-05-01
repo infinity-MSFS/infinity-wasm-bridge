@@ -1,7 +1,7 @@
 /// <reference types="@microsoft/msfs-types/pages/vcockpit/core/vcockpit" />
 /// <reference types="@microsoft/msfs-types/js/common" />
 
-import { BridgeRelay } from "msfs-bridge-relay";
+import { BridgeRelay } from "@infinity-msfs/ts-bridge-relay";
 
 class MyAddonBridgeInstrument extends BaseInstrument {
 	private relay?: BridgeRelay;

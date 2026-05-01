@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "msfs-bridge-relay",
+      "name": "@infinity-msfs/ts-bridge-relay",
       "devDependencies": {
         "@microsoft/msfs-sdk": "*",
         "@microsoft/msfs-types": "*",

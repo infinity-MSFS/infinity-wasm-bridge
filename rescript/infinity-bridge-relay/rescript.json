@@ -1,5 +1,5 @@
 {
-  "name": "@infinity-msfs/bridge-relay",
+  "name": "@infinity-msfs/rescript-bridge-relay",
   "sources": [
     {
       "dir": "src",

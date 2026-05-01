@@ -1,4 +1,4 @@
-# `@infinity-msfs/instrument`
+# `@infinity-msfs/rescript-instrument`
 
 Pure ReScript API for registering MSFS `BaseInstrument` subclasses.
 

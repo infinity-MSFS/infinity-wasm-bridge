@@ -1,5 +1,5 @@
 [package]
-name = "msfs-bridge-example-host"
+name = "infinity-bridge-example-host"
 version.workspace = true
 edition.workspace = true
 publish = false
@@ -13,8 +13,8 @@ name = "fake-gauge"
 path = "src/fake_gauge.rs"
 
 [dependencies]
-msfs-bridge-host = { path = "../../crates/msfs-bridge-host" }
-msfs-bridge-wire = { path = "../../crates/msfs-bridge-wire" }
+infinity-bridge-host = { path = "../../crates/infinity-bridge-host" }
+infinity-bridge-wire = { path = "../../crates/infinity-bridge-wire" }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = "0.26"

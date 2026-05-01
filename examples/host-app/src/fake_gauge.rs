@@ -21,8 +21,8 @@
 //! ```
 
 use futures::{SinkExt, StreamExt};
-use msfs_bridge_wire::{AckPayload, EventPayload, HelloPayload, WireMsg};
-use serde_json::{json, Value};
+use infinity_bridge_wire::{AckPayload, EventPayload, HelloPayload, WireMsg};
+use serde_json::{Value, json};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -139,10 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // ── Commands (host → gauge) ──────────────────────────
             WireMsg::Cmd(cmd) => {
-                println!(
-                    "[gauge] ← Command: name={:?}, id={}",
-                    cmd.name, cmd.id
-                );
+                println!("[gauge] ← Command: name={:?}, id={}", cmd.name, cmd.id);
 
                 let ack = handle_command(&cmd.id, cmd.name.as_deref(), &cmd.payload);
 
@@ -189,7 +186,10 @@ fn handle_command(id: &str, name: Option<&str>, payload: &Value) -> Option<WireM
         }
 
         Some("equip_cmd") => {
-            let idx = payload.get("equipIdx").and_then(|v| v.as_u64()).unwrap_or(0);
+            let idx = payload
+                .get("equipIdx")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             let cmd = payload.get("cmd").and_then(|v| v.as_u64()).unwrap_or(0);
             println!("[gauge]   → equip_cmd: idx={idx}, cmd={cmd}");
             Some(WireMsg::Ack(AckPayload::ok(
