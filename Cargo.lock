@@ -419,7 +419,7 @@ dependencies = [
 
 [[package]]
 name = "infinity-bridge-example-host"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures",
  "infinity-bridge-host",
@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "infinity-bridge-host"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "futures",
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "infinity-bridge-wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "infinity-bridge-wire",
  "serde",
@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "infinity-bridge-wire"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
