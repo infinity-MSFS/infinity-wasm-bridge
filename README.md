@@ -71,7 +71,7 @@ Add the dependency:
 
 ```toml
 [dependencies]
-infinity-bridge-host = { path = "crates/infinity-bridge-host" }
+infinity-bridge-host = "0.1.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
