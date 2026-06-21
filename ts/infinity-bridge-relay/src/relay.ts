@@ -24,8 +24,8 @@ export interface BridgeRelayConfig {
 		meta?: unknown;
 	};
 	dedupCapacity?: number;
-	maxReconnectMs?: number;
-	baseReconnectMs?: number;
+	/** Fixed reconnect interval in ms. Defaults to 1000. */
+	reconnectMs?: number;
 	protocolVersion?: number;
 }
 
@@ -43,15 +43,13 @@ export class BridgeRelay {
 			| "callEvent"
 			| "responseEvent"
 			| "dedupCapacity"
-			| "maxReconnectMs"
-			| "baseReconnectMs"
+			| "reconnectMs"
 			| "protocolVersion"
 		>
 	> & { hello: NonNullable<BridgeRelayConfig["hello"]> };
 
 	private commBus?: ViewListener.ViewListener;
 	private ws?: WebSocket;
-	private wsRetryCount = 0;
 	private wsRetryTimerId?: number;
 
 	private readonly pending = new Map<string, PendingRequest>();
@@ -65,8 +63,7 @@ export class BridgeRelay {
 			responseEvent: config.responseEvent,
 			hello: config.hello ?? { client: "msfs-gauge" },
 			dedupCapacity: config.dedupCapacity ?? 128,
-			maxReconnectMs: config.maxReconnectMs ?? 30_000,
-			baseReconnectMs: config.baseReconnectMs ?? 250,
+			reconnectMs: config.reconnectMs ?? 1_000,
 			protocolVersion: config.protocolVersion ?? 1,
 		};
 		this.dedup = new DedupRing(this.config.dedupCapacity);
@@ -166,7 +163,6 @@ export class BridgeRelay {
 			this.ws = new WebSocket(this.config.wsUrl);
 
 			this.ws.onopen = () => {
-				this.wsRetryCount = 0;
 				console.log("[msfs-bridge] WebSocket connected");
 				this.wsSend(
 					JSON.stringify({
@@ -199,22 +195,10 @@ export class BridgeRelay {
 
 	private scheduleWsReconnect(): void {
 		if (this.wsRetryTimerId !== undefined) return;
-		const delay = this.backoff(this.wsRetryCount++);
-		console.log(
-			`[msfs-bridge] Reconnecting in ${delay}ms (attempt ${this.wsRetryCount})`,
-		);
 		this.wsRetryTimerId = window.setTimeout(() => {
 			this.wsRetryTimerId = undefined;
 			this.connectWs();
-		}, delay);
-	}
-
-	private backoff(attempt: number): number {
-		const base = Math.min(
-			this.config.maxReconnectMs,
-			this.config.baseReconnectMs * Math.pow(2, Math.min(attempt, 10)),
-		);
-		return base + Math.floor(Math.random() * 250);
+		}, this.config.reconnectMs);
 	}
 
 	private cleanupWs(): void {
@@ -222,7 +206,6 @@ export class BridgeRelay {
 			clearTimeout(this.wsRetryTimerId);
 			this.wsRetryTimerId = undefined;
 		}
-		this.wsRetryCount = 0;
 		try {
 			this.ws?.close();
 		} catch {
@@ -401,9 +384,3 @@ export class BridgeRelay {
 		return `${Date.now()}-${++this.requestSeq}`;
 	}
 }
-
-type PongMsg = import("./wire").PongMsg;
-type CmdMsg = import("./wire").CmdMsg;
-type AckMsg = import("./wire").AckMsg;
-type EventMsg = import("./wire").EventMsg;
-type CommBusRequest = import("./wire").CommBusRequest;

@@ -11,7 +11,7 @@
 //
 // The relay owns two concerns:
 //  1. Bidirectional forwarding with request/response correlation.
-//  2. WebSocket connection lifecycle with exponential-backoff reconnect.
+//  2. WebSocket connection lifecycle with fixed-interval reconnect.
 
 open MsfsBindings
 
@@ -44,8 +44,8 @@ type config = {
   responseEvent: string,
   hello?: helloConfig,
   dedupCapacity?: int,
-  maxReconnectMs?: int,
-  baseReconnectMs?: int,
+  /** Fixed reconnect interval in ms. Defaults to 1000. */
+  reconnectMs?: int,
   protocolVersion?: int,
   requestTimeoutMs?: int,
 }
@@ -56,8 +56,7 @@ type resolvedConfig = {
   responseEvent: string,
   hello: helloConfig,
   dedupCapacity: int,
-  maxReconnectMs: int,
-  baseReconnectMs: int,
+  reconnectMs: int,
   protocolVersion: int,
   requestTimeoutMs: int,
 }
@@ -68,7 +67,6 @@ type t = {
   config: resolvedConfig,
   mutable commBus: option<viewListener>,
   mutable ws: option<webSocket>,
-  mutable wsRetryCount: int,
   mutable wsRetryTimerId: option<timerId>,
   pending: Map.t<string, pendingRequest>,
   mutable requestSeq: int,
@@ -84,8 +82,7 @@ let resolveConfig = (c: config): resolvedConfig => {
   responseEvent: c.responseEvent,
   hello: c.hello->Option.getOr({client: "msfs-gauge"}),
   dedupCapacity: c.dedupCapacity->Option.getOr(128),
-  maxReconnectMs: c.maxReconnectMs->Option.getOr(30_000),
-  baseReconnectMs: c.baseReconnectMs->Option.getOr(250),
+  reconnectMs: c.reconnectMs->Option.getOr(1_000),
   protocolVersion: c.protocolVersion->Option.getOr(1),
   requestTimeoutMs: c.requestTimeoutMs->Option.getOr(5000),
 }
@@ -96,7 +93,6 @@ let make = (config: config): t => {
     config: resolved,
     commBus: None,
     ws: None,
-    wsRetryCount: 0,
     wsRetryTimerId: None,
     pending: Map.make(),
     requestSeq: 0,
@@ -120,17 +116,6 @@ let wsSend = (relay: t, text: string): unit =>
     }
   | _ => ()
   }
-
-let backoff = (relay: t, attempt: int): int => {
-  let capped = attempt < 10 ? attempt : 10
-  let base = Int.fromFloat(
-    Math.min(
-      Int.toFloat(relay.config.maxReconnectMs),
-      Int.toFloat(relay.config.baseReconnectMs) *. Math.pow(2.0, ~exp=Int.toFloat(capped)),
-    ),
-  )
-  base + Int.fromFloat(Math.floor(Math.random() *. 250.0))
-}
 
 // ---- Sending an ack back to the host ----
 //
@@ -174,7 +159,6 @@ let rec connectWs = (relay: t): unit => {
       let ws = makeWebSocket(relay.config.wsUrl)
 
       setOnOpen(ws, () => {
-        relay.wsRetryCount = 0
         Console.log("[msfs-bridge] WebSocket connected")
         let hello: Wire.wireMsg = Hello({
           client: relay.config.hello.client->Option.getOr("msfs-gauge"),
@@ -190,7 +174,14 @@ let rec connectWs = (relay: t): unit => {
       })
 
       setOnMessage(ws, ev => onHostMessage(relay, ev.data))
-      setOnError(ws, () => ())
+      // Coherent (MSFS) often fires `onerror` WITHOUT a following `onclose` on a
+      // failed/dropped connect, so reschedule here too — otherwise the relay is
+      // left stuck with a dead socket and never retries. Guarded by the retry
+      // timer, so a following `onclose` is harmless.
+      setOnError(ws, () => {
+        relay.ws = None
+        scheduleWsReconnect(relay)
+      })
       setOnClose(ws, () => {
         relay.ws = None
         scheduleWsReconnect(relay)
@@ -209,15 +200,10 @@ and scheduleWsReconnect = (relay: t): unit =>
   switch relay.wsRetryTimerId {
   | Some(_) => ()
   | None =>
-    let delay = backoff(relay, relay.wsRetryCount)
-    relay.wsRetryCount = relay.wsRetryCount + 1
-    Console.log(
-      `[msfs-bridge] Reconnecting in ${delay->Int.toString}ms (attempt ${relay.wsRetryCount->Int.toString})`,
-    )
     let timer = setTimeout(() => {
       relay.wsRetryTimerId = None
       connectWs(relay)
-    }, delay)
+    }, relay.config.reconnectMs)
     relay.wsRetryTimerId = Some(timer)
   }
 
@@ -422,7 +408,6 @@ let destroy = (relay: t): unit => {
   | None => ()
   }
   relay.wsRetryTimerId = None
-  relay.wsRetryCount = 0
   switch relay.ws {
   | Some(ws) =>
     try wsClose(ws) catch {

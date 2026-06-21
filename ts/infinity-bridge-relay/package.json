@@ -1,6 +1,6 @@
 {
     "name": "@infinity-msfs/ts-bridge-relay",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Generic MSFS gauge relay — bridges WebSocket (host) to CommBus (WASM) transparently",
     "license": "MIT",
     "author": "cameron_griego@protonmail.com",
