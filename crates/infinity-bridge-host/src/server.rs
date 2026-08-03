@@ -7,9 +7,9 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use futures::{SinkExt, StreamExt};
-use infinity_bridge_wire::{BridgeError, EventPayload, WireMsg};
+use infinity_bridge_wire::{BridgeError, EventPayload, READY_EVENT, WireMsg};
 use serde_json::Value;
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 use crate::hub::{ClientInfo, Hub};
 
@@ -146,8 +146,20 @@ impl BridgeServer {
     // ── Connection status ────────────────────────────────────────────
 
     /// Returns `true` if at least one gauge is connected.
+    ///
+    /// An open socket only proves the *relay* is alive. Use [`Self::is_ready`]
+    /// when you need to know whether the module behind it can be reached.
     pub async fn is_connected(&self) -> bool {
         self.hub.is_connected().await
+    }
+
+    /// Returns `true` if at least one connected gauge has reported its
+    /// downstream link bound (see [`infinity_bridge_wire::READY_EVENT`]).
+    ///
+    /// Always `false` with relays that predate the ready event, so treat this
+    /// as a positive signal only — `false` means "not known to be reachable".
+    pub async fn is_ready(&self) -> bool {
+        self.hub.is_ready().await
     }
 
     /// Wait until at least one gauge connects.
@@ -200,15 +212,27 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let hub_for_ping = Arc::clone(&state.hub);
     let ping_interval = state.config.ping_interval;
     let ping_timeout = state.config.ping_timeout;
+    // Signals the read loop that this connection was reaped or gave up, so the
+    // socket is torn down with it. Without this the reaper removes the client
+    // from the hub while its reader keeps running: `touch_client` on a removed
+    // id is a no-op, so the connection can never re-register, the host can no
+    // longer address it, and the gauge — whose socket is still open — never
+    // sees a close and so never reconnects. That state persists for the whole
+    // session and is indistinguishable, from the caller, from a hung module.
+    let (reaped_tx, mut reaped_rx) = oneshot::channel::<()>();
     let ping_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(ping_interval);
         interval.tick().await;
+        let mut reaped_tx = Some(reaped_tx);
         loop {
             interval.tick().await;
 
             {
                 let dead = hub_for_ping.reap_dead_clients(ping_timeout).await;
                 if dead.contains(&client_id) {
+                    if let Some(tx) = reaped_tx.take() {
+                        let _ = tx.send(());
+                    }
                     break;
                 }
             }
@@ -226,12 +250,25 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 Err(_) => continue,
             };
             if hub_for_ping.send_to(client_id, json).await.is_err() {
+                if let Some(tx) = reaped_tx.take() {
+                    let _ = tx.send(());
+                }
                 break;
             }
         }
     });
 
-    while let Some(Ok(msg)) = ws_rx.next().await {
+    loop {
+        let msg = tokio::select! {
+            // Reaped (or the writer died). Drop out of the loop so the socket
+            // is closed and the gauge's reconnect timer takes over.
+            _ = &mut reaped_rx => break,
+            next = ws_rx.next() => match next {
+                Some(Ok(msg)) => msg,
+                _ => break,
+            },
+        };
+
         match msg {
             Message::Text(text) => {
                 state.hub.touch_client(client_id).await;
@@ -247,6 +284,16 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     }
                     WireMsg::Ack(ack) => {
                         state.hub.dispatch_ack(ack).await;
+                    }
+                    // Readiness is connection state, not application data —
+                    // record it and don't fan it out to event subscribers.
+                    WireMsg::Event(event) if event.name == READY_EVENT => {
+                        let ready = event
+                            .data
+                            .get("ready")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(true);
+                        state.hub.set_client_ready(client_id, ready).await;
                     }
                     WireMsg::Event(event) => {
                         state.hub.dispatch_event(event);

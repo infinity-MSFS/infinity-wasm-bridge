@@ -1,6 +1,6 @@
 {
   "name": "@infinity-msfs/rescript-bridge-relay",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "ReScript MSFS CommBus bridge relay for desktop ↔ gauge communication.",
   "license": "MIT",
   "author": "cameron_griego@protonmail.com",

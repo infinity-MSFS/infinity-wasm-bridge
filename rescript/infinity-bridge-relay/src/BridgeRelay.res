@@ -17,6 +17,11 @@ open MsfsBindings
 
 exception BridgeError(string)
 
+// Gauge → host connection-state event. Announces that the CommBus listener
+// is bound, i.e. that a command sent to this relay can actually reach a WASM
+// module. Must match `infinity_bridge_wire::READY_EVENT`.
+let readyEventName = "__bridge_ready"
+
 // ---- Pending requests ----
 
 type pendingRequest = {
@@ -47,7 +52,18 @@ type config = {
   /** Fixed reconnect interval in ms. Defaults to 1000. */
   reconnectMs?: int,
   protocolVersion?: int,
+  /**
+   * How long to wait for the WASM module to answer before acking the host
+   * with `WASM_TIMEOUT`. Defaults to 2500.
+   *
+   * **Keep this below the host's own command timeout.** If the host gives up
+   * first, its caller sees a generic transport timeout and this relay's
+   * diagnosis of *why* nothing answered — module absent, CommBus unbound,
+   * handler threw — is discarded with the request.
+   */
   requestTimeoutMs?: int,
+  /** Retry interval for a CommBus bind that hasn't taken. Defaults to 1000. */
+  bindRetryMs?: int,
 }
 
 type resolvedConfig = {
@@ -59,6 +75,7 @@ type resolvedConfig = {
   reconnectMs: int,
   protocolVersion: int,
   requestTimeoutMs: int,
+  bindRetryMs: int,
 }
 
 // ---- Relay state ----
@@ -66,6 +83,10 @@ type resolvedConfig = {
 type t = {
   config: resolvedConfig,
   mutable commBus: option<viewListener>,
+  // Whether the response listener is actually attached to the CommBus. The
+  // handle existing is not the same thing — see `init`.
+  mutable commBusBound: bool,
+  mutable bindRetryTimerId: option<timerId>,
   mutable ws: option<webSocket>,
   mutable wsRetryTimerId: option<timerId>,
   pending: Map.t<string, pendingRequest>,
@@ -84,7 +105,8 @@ let resolveConfig = (c: config): resolvedConfig => {
   dedupCapacity: c.dedupCapacity->Option.getOr(128),
   reconnectMs: c.reconnectMs->Option.getOr(1_000),
   protocolVersion: c.protocolVersion->Option.getOr(1),
-  requestTimeoutMs: c.requestTimeoutMs->Option.getOr(5000),
+  requestTimeoutMs: c.requestTimeoutMs->Option.getOr(2500),
+  bindRetryMs: c.bindRetryMs->Option.getOr(1_000),
 }
 
 let make = (config: config): t => {
@@ -92,6 +114,8 @@ let make = (config: config): t => {
   {
     config: resolved,
     commBus: None,
+    commBusBound: false,
+    bindRetryTimerId: None,
     ws: None,
     wsRetryTimerId: None,
     pending: Map.make(),
@@ -139,6 +163,59 @@ let sendAck = (
   wsSend(relay, Wire.stringify(ack))
 }
 
+// ---- Readiness ----
+//
+// Tell the host whether this relay can currently reach a WASM module. An
+// open socket only proves the Coherent gauge is alive: the panel loads long
+// before the aircraft's systems do, and a relay whose CommBus never bound
+// looks identical from the far end. Sent on every edge that can change the
+// answer (bind, WS open), so a host that missed one gets the next.
+
+let sendReady = (relay: t): unit => {
+  let evt: Wire.wireMsg = Event({
+    name: readyEventName,
+    data: JSON.Encode.object(
+      Dict.fromArray([("ready", JSON.Encode.bool(relay.commBusBound))]),
+    ),
+  })
+  wsSend(relay, Wire.stringify(evt))
+}
+
+// Attach the response listener. Idempotent: `init` binds from two paths
+// because either one can be the one that wins the race, and a retry timer
+// covers the case where both lose.
+let bindCommBus = (relay: t, bus: viewListener): unit =>
+  if !relay.commBusBound {
+    switch relay.onWasmHandler {
+    | Some(h) =>
+      try {
+        on_(bus, relay.config.responseEvent, h)
+        relay.commBusBound = true
+        sendReady(relay)
+      } catch {
+      | exn => Console.error2("[msfs-bridge] CommBus bind failed:", exn)
+      }
+    | None => ()
+    }
+  }
+
+let rec scheduleBindRetry = (relay: t): unit =>
+  if !relay.commBusBound {
+    switch relay.bindRetryTimerId {
+    | Some(_) => ()
+    | None =>
+      let timer = setTimeout(() => {
+        relay.bindRetryTimerId = None
+        switch relay.commBus {
+        | Some(bus) => bindCommBus(relay, bus)
+        | None => ()
+        }
+        scheduleBindRetry(relay)
+      }, relay.config.bindRetryMs)
+      relay.bindRetryTimerId = Some(timer)
+    }
+  }
+
 // ---- Connection lifecycle ----
 //
 // connectWs, scheduleWsReconnect, and onHostMessage form a mutually
@@ -171,6 +248,9 @@ let rec connectWs = (relay: t): unit => {
           meta: ?relay.config.hello.meta,
         })
         wsSend(relay, Wire.stringify(hello))
+        // A reconnect lands on a fresh client record on the host, which
+        // starts out not-ready however long we've been bound down here.
+        sendReady(relay)
       })
 
       setOnMessage(ws, ev => onHostMessage(relay, ev.data))
@@ -248,11 +328,16 @@ and onHostCommand = (relay: t, cmd: Wire.wireMsg): unit =>
 
       let timerId = setTimeout(() => {
         Map.delete(relay.pending, requestId)->ignore
+        // Distinguish "nobody answered" from "nobody could have answered" —
+        // the two have completely different fixes, and the host can only
+        // report what we put in the ack.
         sendAck(
           relay,
           ~id=cmdId,
           ~ok=false,
-          ~error="WASM_TIMEOUT: no response from WASM gauge",
+          ~error=relay.commBusBound
+            ? "WASM_TIMEOUT: no response from WASM gauge"
+            : "COMMBUS_NOT_BOUND: response listener never attached — no WASM module is reachable",
         )
       }, relay.config.requestTimeoutMs)
 
@@ -285,6 +370,8 @@ and onHostCommand = (relay: t, cmd: Wire.wireMsg): unit =>
         | None => ()
         }
       | Some(bus) =>
+        // Recover a bind that never took before spending a request on it.
+        bindCommBus(relay, bus)
         let envelopeJson = Wire.stringifyEnvelope(envelope)
         call(bus, "COMM_BUS_WASM_CALLBACK", relay.config.callEvent, envelopeJson)
         ->Promise.catch(err => {
@@ -367,15 +454,31 @@ let init = (relay: t): unit => {
   let handler = raw => onWasmMessage(relay, raw)
   relay.onWasmHandler = Some(handler)
 
-  // Register the CommBus listener. The continuation fires once the
-  // listener has been bound by the sim runtime.
-  let bus = registerViewListener("JS_LISTENER_COMM_BUS", () => {
-    switch (relay.commBus, relay.onWasmHandler) {
-    | (Some(b), Some(h)) => on_(b, relay.config.responseEvent, h)
-    | _ => ()
+  // Register the CommBus listener.
+  //
+  // The continuation fires once the sim runtime has bound the listener —
+  // which may be LATER, or may be RIGHT NOW. It fires synchronously whenever
+  // the view listener is already connected: a second relay in the same gauge,
+  // or any panel reload after the first. Reading `relay.commBus` from inside
+  // it loses that case, because the assignment below hasn't run yet, and the
+  // silent `_ => ()` fallthrough then leaves the response listener unbound
+  // for the rest of the session. Every request the host makes times out, the
+  // socket stays open the whole time, and nothing anywhere reports a fault.
+  //
+  // So bind through a ref both paths can see, bind again unconditionally once
+  // the handle is in hand, and keep retrying if neither took. `bindCommBus`
+  // is idempotent, so exactly one listener is registered whichever path wins.
+  let busRef = ref(None)
+  let bus = registerViewListener("JS_LISTENER_COMM_BUS", () =>
+    switch busRef.contents {
+    | Some(b) => bindCommBus(relay, b)
+    | None => () // fired synchronously — the bind below covers it
     }
-  })
+  )
+  busRef := Some(bus)
   relay.commBus = Some(bus)
+  bindCommBus(relay, bus)
+  scheduleBindRetry(relay)
 }
 
 let destroy = (relay: t): unit => {
@@ -400,7 +503,13 @@ let destroy = (relay: t): unit => {
   | _ => ()
   }
   relay.commBus = None
+  relay.commBusBound = false
   relay.onWasmHandler = None
+  switch relay.bindRetryTimerId {
+  | Some(id) => clearTimeout(id)
+  | None => ()
+  }
+  relay.bindRetryTimerId = None
 
   // Cancel any pending reconnect and close the socket.
   switch relay.wsRetryTimerId {

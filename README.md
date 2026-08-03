@@ -244,6 +244,22 @@ The TypeScript relay maintains a bounded LRU ring (`DedupRing`, default capacity
 
 The relay reconnects to the WebSocket server automatically using exponential backoff with jitter: `min(maxReconnectMs, baseReconnectMs × 2^attempt) + rand(0..250ms)`. Defaults: base 250 ms, max 30 s.
 
+### Timeout ordering
+
+There are two timeouts on every command — the host's (`BridgeServer::command`) and the relay's (`requestTimeoutMs`) — and **the relay's must be the shorter of the two.**
+
+The relay is the only party that can tell you *why* a command went unanswered: whether the WASM module never replied, or its CommBus listener was never bound in the first place. It reports that by acking with an error. If the host's timeout fires first, that ack arrives to a request that no longer exists, the diagnosis is discarded, and every distinct cause reaches the caller as one indistinguishable `TIMEOUT`.
+
+The relay defaults to 2500 ms so it fits inside a 3 s host timeout out of the box. Raise the host's first if you need longer.
+
+### Readiness
+
+An open socket proves the *relay* is alive. It does not prove anything behind it is: in MSFS the Coherent panel hosting the relay loads well before the aircraft's WASM modules exist, so there is a window — seconds, sometimes longer on a cold load — where the socket is up and no command can possibly be served.
+
+The relay emits `__bridge_ready` (`infinity_bridge_wire::READY_EVENT`) as soon as its CommBus listener is bound, and again on every reconnect. The host consumes it rather than fanning it out to event subscribers, prefers ready clients when dispatching a command, and exposes `BridgeServer::is_ready()` alongside `is_connected()`.
+
+Readiness is a **positive signal only.** Relays predating the event never send one, so the host falls back to broadcasting to every client when nothing has reported ready. Treat `is_ready() == false` as "not known to be reachable", never as "unreachable".
+
 ---
 
 ## Configuration Reference
@@ -275,8 +291,12 @@ ServerConfig::new("127.0.0.1:9876", "/bridge")
     baseReconnectMs?: number; // Default 250
     maxReconnectMs?: number;  // Default 30_000
     protocolVersion?: number; // Default 1
+    requestTimeoutMs?: number; // Default 2500 — MUST stay below the host's
+    bindRetryMs?: number;      // Default 1000 — CommBus bind retry cadence
 }
 ```
+
+The ReScript relay (`@infinity-msfs/rescript-bridge-relay`) takes the same fields.
 
 ### `BridgeConfig` (WASM)
 

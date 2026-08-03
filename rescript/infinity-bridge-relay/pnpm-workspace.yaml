@@ -1,2 +1,2 @@
 allowBuilds:
-  rescript: set this to true or false
+  rescript: true

@@ -3,7 +3,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use infinity_bridge_wire::{AckPayload, BridgeError, CmdPayload, EventPayload, HelloPayload, WireMsg};
+use infinity_bridge_wire::{
+    AckPayload, BridgeError, CmdPayload, EventPayload, HelloPayload, WireMsg,
+};
 use serde_json::Value;
 use tokio::sync::{Mutex, broadcast, mpsc, oneshot, watch};
 use uuid::Uuid;
@@ -54,6 +56,7 @@ impl Hub {
                 tx,
                 hello: None,
                 last_seen: tokio::time::Instant::now(),
+                ready: false,
             },
         );
         self.connection_tx.send_replace(true);
@@ -103,8 +106,26 @@ impl Hub {
         dead
     }
 
+    /// Record a client's downstream readiness (see
+    /// [`infinity_bridge_wire::READY_EVENT`]).
+    pub async fn set_client_ready(&self, id: u64, ready: bool) {
+        let mut clients = self.clients.lock().await;
+        if let Some(c) = clients.get_mut(&id) {
+            c.ready = ready;
+        }
+    }
+
     pub async fn is_connected(&self) -> bool {
         !self.clients.lock().await.is_empty()
+    }
+
+    /// `true` when at least one client has reported its downstream link bound.
+    ///
+    /// Distinct from [`Self::is_connected`]: a relay gauge can hold an open
+    /// socket for the whole session while the module it fronts is still
+    /// loading, absent, or has lost its IPC binding.
+    pub async fn is_ready(&self) -> bool {
+        self.clients.lock().await.values().any(|c| c.ready)
     }
 
     pub async fn wait_connected(&self) {
@@ -192,8 +213,31 @@ impl Hub {
                     "no gauges connected — cannot send command",
                 ));
             }
+
+            // Prefer clients that have reported their downstream link bound.
+            // Broadcasting to a relay whose CommBus isn't attached burns the
+            // full timeout on a socket that was never going to answer. When
+            // nothing has ever reported ready the flag carries no information
+            // (older relays don't send it), so fall back to every client.
+            let any_ready = clients.values().any(|c| c.ready);
+            let mut delivered = 0usize;
             for client in clients.values() {
-                let _ = client.tx.send(json.clone());
+                if any_ready && !client.ready {
+                    continue;
+                }
+                if client.tx.send(json.clone()).is_ok() {
+                    delivered += 1;
+                }
+            }
+
+            // Every target's writer half is gone: the sockets are dead but not
+            // yet unregistered. Fail now instead of waiting out the timeout —
+            // the caller can retry into a fresh connection immediately.
+            if delivered == 0 {
+                self.pending.lock().await.remove(&id);
+                return Err(BridgeError::transport(
+                    "no gauge connection accepted the command",
+                ));
             }
         }
 
@@ -247,5 +291,120 @@ impl Hub {
             let _ = client.tx.send(json.clone());
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use infinity_bridge_wire::ErrorKind;
+
+    /// Long enough to prove nothing was delivered, short enough to keep the
+    /// suite quick — no ack is ever sent in these tests.
+    const NO_ACK: Duration = Duration::from_millis(50);
+
+    #[tokio::test]
+    async fn readiness_is_tracked_per_client() {
+        let hub = Hub::new(16);
+        let (tx_a, _rx_a) = mpsc::unbounded_channel();
+        let (tx_b, _rx_b) = mpsc::unbounded_channel();
+        let a = hub.register_client(tx_a).await;
+        let _b = hub.register_client(tx_b).await;
+
+        assert!(hub.is_connected().await);
+        assert!(!hub.is_ready().await, "a fresh client is not yet ready");
+
+        hub.set_client_ready(a, true).await;
+        assert!(hub.is_ready().await);
+
+        hub.set_client_ready(a, false).await;
+        assert!(!hub.is_ready().await);
+        assert!(hub.is_connected().await, "readiness is not connectedness");
+    }
+
+    #[tokio::test]
+    async fn a_command_skips_clients_that_are_not_ready() {
+        let hub = Hub::new(16);
+        let (tx_stale, mut rx_stale) = mpsc::unbounded_channel();
+        let (tx_live, mut rx_live) = mpsc::unbounded_channel();
+        let _stale = hub.register_client(tx_stale).await;
+        let live = hub.register_client(tx_live).await;
+        hub.set_client_ready(live, true).await;
+
+        let err = hub
+            .command(Some("ping"), Value::Null, NO_ACK)
+            .await
+            .expect_err("nothing acks in this test");
+        assert_eq!(err.kind(), ErrorKind::Timeout);
+
+        assert!(
+            rx_live.try_recv().is_ok(),
+            "the ready client got the command"
+        );
+        assert!(
+            rx_stale.try_recv().is_err(),
+            "a relay that never reported ready must not absorb the timeout budget"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_command_goes_everywhere_while_readiness_is_unknown() {
+        // Relays predating the ready event never send one. Their silence must
+        // read as "unknown", not "unreachable", or they stop working entirely.
+        let hub = Hub::new(16);
+        let (tx_a, mut rx_a) = mpsc::unbounded_channel();
+        let (tx_b, mut rx_b) = mpsc::unbounded_channel();
+        hub.register_client(tx_a).await;
+        hub.register_client(tx_b).await;
+
+        let _ = hub.command(Some("ping"), Value::Null, NO_ACK).await;
+
+        assert!(rx_a.try_recv().is_ok());
+        assert!(rx_b.try_recv().is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_command_fails_fast_when_every_connection_is_gone() {
+        // Sockets can be dead before the reaper has unregistered them. Waiting
+        // out the full timeout for a send that provably went nowhere is time
+        // the caller could have spent retrying into a fresh connection.
+        let hub = Hub::new(16);
+        let (tx, rx) = mpsc::unbounded_channel();
+        hub.register_client(tx).await;
+        drop(rx);
+
+        let start = tokio::time::Instant::now();
+        let err = hub
+            .command(Some("ping"), Value::Null, Duration::from_secs(30))
+            .await
+            .expect_err("the only receiver is gone");
+        assert_eq!(err.kind(), ErrorKind::Transport);
+        assert!(
+            start.elapsed() < Duration::from_secs(1),
+            "should not have waited out the timeout"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_timed_out_command_leaves_no_pending_entry() {
+        let hub = Hub::new(16);
+        let (tx, _rx) = mpsc::unbounded_channel();
+        hub.register_client(tx).await;
+
+        let _ = hub.command(Some("ping"), Value::Null, NO_ACK).await;
+        assert!(hub.pending.lock().await.is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_silent_client_is_reaped_and_named() {
+        let hub = Hub::new(16);
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let id = hub.register_client(tx).await;
+
+        tokio::time::advance(Duration::from_secs(31)).await;
+        let dead = hub.reap_dead_clients(Duration::from_secs(30)).await;
+
+        assert_eq!(dead, vec![id], "the reaper names who it dropped");
+        assert!(!hub.is_connected().await);
     }
 }
